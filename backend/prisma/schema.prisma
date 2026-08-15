@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("STAFF")
+  branchId     Int?
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Restaurant {
+  id        Int      @id @default(autoincrement())
+  name      String
+  branches  Branch[]
+  createdAt DateTime @default(now())
+}
+
+model Branch {
+  id             Int             @id @default(autoincrement())
+  name           String
+  restaurantId   Int
+  restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  users          User[]
+  categories     MenuCategory[]
+  menuItems      MenuItem[]
+  tables         DiningTable[]
+  rooms          Room[]
+  orders         Order[]
+  inventoryItems InventoryItem[]
+  employees      Employee[]
+  customers      Customer[]
+  createdAt      DateTime        @default(now())
+}
+
+model MenuCategory {
+  id       Int        @id @default(autoincrement())
+  name     String
+  branchId Int
+  branch   Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  items    MenuItem[]
+
+  @@unique([branchId, name])
+}
+
+model MenuItem {
+  id          Int                @id @default(autoincrement())
+  name        String
+  description String?
+  price       Decimal            @db.Decimal(10, 2)
+  emoji       String             @default("🍽️")
+  available   Boolean            @default(true)
+  categoryId  Int
+  category    MenuCategory       @relation(fields: [categoryId], references: [id])
+  branchId    Int
+  branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
+  recipes     RecipeIngredient[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model DiningTable {
+  id       Int     @id @default(autoincrement())
+  name     String
+  seats    Int     @default(2)
+  status   String  @default("AVAILABLE")
+  branchId Int
+  branch   Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  orders   Order[]
+
+  @@unique([branchId, name])
+}
+
+model Room {
+  id             Int           @id @default(autoincrement())
+  name           String
+  floorNumber    Int           @default(1)
+  attendantCount Int           @default(0)
+  capacity       Int           @default(6)
+  hourlyRate     Decimal       @default(0) @db.Decimal(10, 2)
+  status         String        @default("AVAILABLE")
+  branchId       Int
+  branch         Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  orders         Order[]
+  sessions       RoomSession[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([branchId, name])
+}
+
+model RoomSession {
+  id          Int                       @id @default(autoincrement())
+  roomId      Int
+  room        Room                      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  startTime   DateTime                  @default(now())
+  endTime     DateTime?
+  assignments RoomAttendantAssignment[]
+  createdAt   DateTime                  @default(now())
+}
+
+model RoomAttendantAssignment {
+  id         Int         @id @default(autoincrement())
+  sessionId  Int
+  session    RoomSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  employeeId Int
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  startTime  DateTime    @default(now())
+  endTime    DateTime?
+}
+
+model Order {
+  id          Int          @id @default(autoincrement())
+  orderNumber String       @unique
+  type        String       @default("DINE_IN")
+  status      String       @default("NEW")
+  subtotal    Decimal      @db.Decimal(10, 2)
+  discount    Decimal      @default(0) @db.Decimal(10, 2)
+  tax         Decimal      @db.Decimal(10, 2)
+  total       Decimal      @db.Decimal(10, 2)
+  notes       String?
+  branchId    Int
+  branch      Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  tableId     Int?
+  table       DiningTable? @relation(fields: [tableId], references: [id])
+  roomId      Int?
+  room        Room?        @relation(fields: [roomId], references: [id])
+  customerId  Int?
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  items       OrderItem[]
+  payments    Payment[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  quantity   Int
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  notes      String?
+  status     String   @default("NEW")
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+}
+
+model Payment {
+  id        Int      @id @default(autoincrement())
+  method    String
+  amount    Decimal  @db.Decimal(10, 2)
+  status    String   @default("COMPLETED")
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model InventoryItem {
+  id          Int                @id @default(autoincrement())
+  name        String
+  category    String
+  department  String              @default("KITCHEN")
+  unit        String
+  quantity    Decimal            @db.Decimal(10, 3)
+  parLevel    Decimal            @db.Decimal(10, 3)
+  costPerUnit Decimal            @default(0) @db.Decimal(10, 2)
+  expiresAt   DateTime?
+  branchId    Int
+  branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  recipes     RecipeIngredient[]
+  movements   StockMovement[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@unique([branchId, name])
+}
+
+model RecipeIngredient {
+  id              Int           @id @default(autoincrement())
+  quantity        Decimal       @db.Decimal(10, 3)
+  menuItemId      Int
+  menuItem        MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  inventoryItemId Int
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, inventoryItemId])
+}
+
+model StockMovement {
+  id              Int           @id @default(autoincrement())
+  type            String
+  quantity        Decimal       @db.Decimal(10, 3)
+  reason          String?
+  inventoryItemId Int
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+}
+
+model Employee {
+  id              Int                       @id @default(autoincrement())
+  staffId         String?
+  name            String
+  email           String?
+  role            String
+  phone           String?
+  active          Boolean                   @default(true)
+  hourlyRate      Decimal                   @default(0) @db.Decimal(10, 2)
+  branchId        Int
+  branch          Branch                    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  attendances     Attendance[]
+  roomAssignments RoomAttendantAssignment[]
+  createdAt       DateTime                  @default(now())
+
+  @@unique([branchId, staffId])
+}
+
+model Attendance {
+  id         Int       @id @default(autoincrement())
+  clockIn    DateTime  @default(now())
+  clockOut   DateTime?
+  employeeId Int
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model Customer {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String?
+  phone         String?
+  loyaltyPoints Int      @default(0)
+  branchId      Int
+  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  orders        Order[]
+  createdAt     DateTime @default(now())
+}

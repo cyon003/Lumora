@@ -1,0 +1,31 @@
+.daily-report > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding: 18px 20px; border: 1px solid #dce6e2; border-radius: 12px; background: #fff; }
+.daily-report header small { color: #277b70; font-size: 7px; font-weight: 700; letter-spacing: 1.2px; }
+.daily-report header h2 { margin: 5px 0 4px; color: #29443b; font-size: 19px; }
+.daily-report header p { margin: 0; color: #84938d; font-size: 8px; }
+.daily-report header button { padding: 9px 13px; border: 1px solid #d5e1dc; border-radius: 7px; color: #316e64; background: #f3f8f6; font-size: 8px; font-weight: 700; cursor: pointer; }
+.daily-report-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+.daily-report-grid article { display: flex; align-items: center; gap: 15px; padding: 22px; border: 1px solid #dfe7e3; border-radius: 12px; background: #fff; box-shadow: 0 5px 16px rgba(30,72,60,.05); }
+.daily-report-grid article > span { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 13px; color: #17685f; background: #e3f2ee; font-size: 21px; }
+.daily-report-grid article > div { display: flex; flex-direction: column; gap: 5px; }
+.daily-report-grid small { color: #84948d; font-size: 8px; text-transform: uppercase; }
+.daily-report-grid strong { color: #1d4c42; font-size: 22px; }
+.daily-report-grid p { margin: 0; color: #98a39e; font-size: 7px; }
+.daily-grand-total { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding: 25px 28px; border-radius: 13px; color: #fff; background: linear-gradient(135deg,#145d54,#24877a); box-shadow: 0 12px 28px rgba(20,93,84,.22); }
+.daily-grand-total small { font-size: 8px; letter-spacing: 1.3px; opacity: .76; }
+.daily-grand-total h3 { margin: 7px 0 0; font-size: 10px; font-weight: 500; opacity: .8; }
+.daily-grand-total > strong { font-size: 31px; }
+.attendance-report { margin-top: 16px; overflow: hidden; border: 1px solid #dfe7e3; border-radius: 12px; background: #fff; }
+.attendance-report > header { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 17px 20px; border: 0; border-bottom: 1px solid #e3eae7; border-radius: 0; background: #f7faf9; }
+.attendance-report header h3 { margin: 5px 0 0; color: #29443b; font-size: 13px; }
+.attendance-report header > div:last-child { display: flex; gap: 8px; }
+.attendance-report header span { display: flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 12px; color: #63766e; background: #e8efec; font-size: 7px; }
+.attendance-report header span b { color: #405a51; font-size: 9px; }
+.attendance-report header span.present { color: #277157; background: #dff2e9; }
+.attendance-report header span.absent { color: #9c4d42; background: #f9e3df; }
+.attendance-report-table { padding: 5px 20px 14px; overflow-x: auto; }
+.attendance-report-row { display: grid; grid-template-columns: .7fr 1.4fr .8fr .8fr .8fr .6fr .7fr; align-items: center; gap: 10px; min-width: 760px; min-height: 48px; border-top: 1px solid #e9eeec; color: #6e8078; font-size: 8px; }
+.attendance-report-row.headings { min-height: 32px; border: 0; color: #98a49f; font-size: 7px; text-transform: uppercase; }
+.attendance-report-row strong { color: #24756a; }.attendance-report-row > b { color: #29443b; }
+.attendance-report-row > i { width: max-content; padding: 5px 8px; border-radius: 10px; font-size: 6px; font-style: normal; font-weight: 700; }
+.attendance-report-row > i.present { color: #267057; background: #dff2e8; }.attendance-report-row > i.absent { color: #a04c42; background: #fae3df; }
+@media(max-width:650px){.daily-report-grid{grid-template-columns:1fr}.daily-report>header{align-items:flex-start;gap:12px}.daily-grand-total{align-items:flex-start;flex-direction:column;gap:15px}}

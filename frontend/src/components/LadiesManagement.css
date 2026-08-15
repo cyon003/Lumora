@@ -1,0 +1,79 @@
+.ladies-management .panel-heading > button {
+  padding: 8px 11px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  background: #17685f;
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lady-manage-row {
+  grid-template-columns: 34px minmax(0, 1fr) auto auto auto;
+  gap: 10px;
+}
+
+.lady-manage-row > b {
+  color: #17685f;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.lady-manage-row > button {
+  padding: 6px 9px;
+  border: 1px solid #d5e1dc;
+  border-radius: 6px;
+  color: #386c62;
+  background: #f3f8f6;
+  font-size: 7px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lady-manage-row > .delete-lady {
+  border-color: #f0cbc5;
+  color: #a54940;
+  background: #fff3f1;
+}
+
+.lady-manage-row.inactive { opacity: .55; }
+
+.staff-member-row { grid-template-columns: 34px minmax(0, 1fr) auto auto; gap: 9px; }
+.staff-role-badge {
+  padding: 5px 8px;
+  border-radius: 10px;
+  color: #276d63;
+  background: #e1f1ed;
+  font-size: 6px;
+  font-style: normal;
+  font-weight: 700;
+}
+.staff-role-badge.kitchen { color: #8c6329; background: #fff0d5; }
+.staff-role-badge.manager { color: #574189; background: #eee8fa; }
+
+.staff-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.staff-tabs button { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border: 1px solid #dce6e2; border-radius: 9px; color: #64776f; background: #fff; font-size: 9px; font-weight: 700; cursor: pointer; }
+.staff-tabs button b { display: grid; place-items: center; min-width: 24px; height: 24px; border-radius: 12px; color: #17685f; background: #e4f2ee; }
+.staff-tabs button.active { border-color: #277c71; color: #fff; background: #17685f; box-shadow: 0 6px 16px rgba(23,104,95,.18); }
+.staff-tabs button.active b { color: #17685f; background: #fff; }
+.staff-table { padding: 8px 20px 18px; overflow-x: auto; }
+.staff-row { display: grid; grid-template-columns: .7fr 1.5fr .8fr 1fr .8fr 1fr; align-items: center; gap: 12px; min-width: 760px; min-height: 62px; border-top: 1px solid #e8eeeb; color: #667970; font-size: 9px; }
+.staff-row.headings { min-height: 38px; border: 0; color: #94a19b; font-size: 7px; text-transform: uppercase; }
+.staff-row > strong { color: #17685f; }
+.staff-row.inactive { opacity: .52; }
+.staff-name { display: flex; align-items: center; gap: 9px; }
+.staff-name i { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; background: #438d82; font-size: 7px; font-style: normal; }
+.staff-name b { color: #29443b; }
+.staff-actions { display: flex; gap: 6px; }
+.staff-actions button { padding: 6px 9px; border: 1px solid #d5e1dc; border-radius: 6px; color: #386c62; background: #f3f8f6; font-size: 7px; font-weight: 700; cursor: pointer; }
+.staff-actions .remove { border-color: #efcbc5; color: #a54940; background: #fff3f1; }
+.room-modal form > label select { width: 100%; height: 42px; padding: 0 12px; border: 1px solid #d8e2de; border-radius: 8px; color: #233e35; background: #fbfdfc; font-size: 10px; }
+
+@media (max-width: 600px) {
+  .staff-tabs { grid-template-columns: 1fr 1fr; }
+  .lady-manage-row { grid-template-columns: 34px 1fr auto; }
+  .lady-manage-row > button { display: none; }
+  .staff-member-row { grid-template-columns: 34px 1fr auto; }
+  .staff-member-row > button { display: none; }
+}

@@ -1,0 +1,129 @@
+import prisma from "../database/prisma.js";
+import { getBranchId } from "../services/workspace.js";
+
+const includeOrder = { items: { include: { menuItem: { include: { category: true } } } }, table: true, room: true, customer: true, payments: true };
+const fail = (res, error) => { console.error(error); return res.status(500).json({ message: "Unable to complete request" }); };
+
+export async function getBootstrap(req, res) {
+  try {
+    const branchId = await getBranchId(req.user.userId);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const [branch, categories, menuItems, tables, rooms, inventory, employees, customers] = await Promise.all([
+      prisma.branch.findUnique({ where: { id: branchId }, include: { restaurant: true } }),
+      prisma.menuCategory.findMany({ where: { branchId }, orderBy: { name: "asc" } }),
+      prisma.menuItem.findMany({ where: { branchId }, include: { category: true }, orderBy: { name: "asc" } }),
+      prisma.diningTable.findMany({ where: { branchId }, orderBy: { id: "asc" } }),
+      prisma.room.findMany({ where: { branchId }, include: { orders: { select: { total: true, status: true } } }, orderBy: { name: "asc" } }),
+      prisma.inventoryItem.findMany({ where: { branchId }, include: { movements: { where: { type: "RESTOCK", createdAt: { gte: today } }, orderBy: { createdAt: "desc" } } }, orderBy: { name: "asc" } }),
+      prisma.employee.findMany({ where: { branchId }, include: { attendances: { where: { clockOut: null }, take: 1 } }, orderBy: { name: "asc" } }),
+      prisma.customer.findMany({ where: { branchId }, orderBy: { loyaltyPoints: "desc" } }),
+    ]);
+    const role = req.user.role;
+    res.json({
+      branch, categories, menuItems, tables,
+      rooms: rooms.map(({ orders, ...room }) => ({
+        ...room,
+        currentBill: orders.filter((order) => !["PAID", "CANCELLED"].includes(order.status)).reduce((sum, order) => sum + Number(order.total), 0),
+        totalBills: orders.filter((order) => order.status !== "CANCELLED").reduce((sum, order) => sum + Number(order.total), 0),
+      })),
+      inventory: ["ADMIN", "MANAGER", "KITCHEN"].includes(role) ? inventory : [],
+      employees: ["ADMIN", "MANAGER", "HEAD_LADY"].includes(role) ? employees : [],
+      customers: ["ADMIN", "MANAGER"].includes(role) ? customers : [],
+    });
+  } catch (error) { return fail(res, error); }
+}
+
+export async function getOrders(req, res) {
+  try { const branchId = await getBranchId(req.user.userId); res.json({ orders: await prisma.order.findMany({ where: { branchId }, include: includeOrder, orderBy: { createdAt: "desc" }, take: 100 }) }); }
+  catch (error) { return fail(res, error); }
+}
+
+export async function createOrder(req, res) {
+  try {
+    const branchId = await getBranchId(req.user.userId);
+    const { items, type = "DINE_IN", tableId, roomId, customerId, discount = 0, paymentMethod = "CASH" } = req.body;
+    if (!Array.isArray(items) || !items.length) return res.status(400).json({ message: "Order requires at least one item" });
+    const ids = items.map((item) => Number(item.menuItemId));
+    const menuItems = await prisma.menuItem.findMany({ where: { id: { in: ids }, branchId, available: true }, include: { recipes: true } });
+    if (menuItems.length !== new Set(ids).size) return res.status(400).json({ message: "One or more menu items are unavailable" });
+    const subtotal = items.reduce((sum, item) => sum + Number(menuItems.find((m) => m.id === Number(item.menuItemId)).price) * Number(item.quantity), 0);
+    const discountValue = Math.max(0, Number(discount)); const tax = (subtotal - discountValue) * 0.08; const total = subtotal - discountValue + tax;
+    const order = await prisma.$transaction(async (tx) => {
+      const created = await tx.order.create({ data: { orderNumber: `L${Date.now().toString().slice(-8)}`, type, status: "NEW", subtotal, discount: discountValue, tax, total, branchId, tableId: tableId ? Number(tableId) : null, roomId: roomId ? Number(roomId) : null, customerId: customerId ? Number(customerId) : null, items: { create: items.map((item) => ({ menuItemId: Number(item.menuItemId), quantity: Number(item.quantity), unitPrice: menuItems.find((m) => m.id === Number(item.menuItemId)).price })) }, payments: { create: { method: paymentMethod, amount: total } } }, include: includeOrder });
+      for (const item of items) {
+        const menuItem = menuItems.find((m) => m.id === Number(item.menuItemId));
+        for (const recipe of menuItem.recipes) {
+          const used = Number(recipe.quantity) * Number(item.quantity);
+          await tx.inventoryItem.update({ where: { id: recipe.inventoryItemId }, data: { quantity: { decrement: used } } });
+          await tx.stockMovement.create({ data: { inventoryItemId: recipe.inventoryItemId, type: "SALE", quantity: -used, reason: created.orderNumber } });
+        }
+      }
+      if (customerId) await tx.customer.update({ where: { id: Number(customerId) }, data: { loyaltyPoints: { increment: Math.floor(total) } } });
+      if (tableId) await tx.diningTable.update({ where: { id: Number(tableId) }, data: { status: "OCCUPIED" } });
+      if (roomId) await tx.room.update({ where: { id: Number(roomId) }, data: { status: "OCCUPIED" } });
+      return created;
+    });
+    res.status(201).json({ order });
+  } catch (error) { return fail(res, error); }
+}
+
+export async function updateOrderStatus(req, res) {
+  try {
+    const branchId = await getBranchId(req.user.userId); const status = String(req.body.status || "");
+    if (!["NEW","PREPARING","READY","SERVED","PAID","CANCELLED"].includes(status)) return res.status(400).json({ message: "Invalid status" });
+    const existing = await prisma.order.findFirst({ where: { id: Number(req.params.id), branchId } });
+    if (!existing) return res.status(404).json({ message: "Order not found" });
+    const order = await prisma.order.update({ where: { id: existing.id }, data: { status }, include: includeOrder });
+    if (["PAID","CANCELLED"].includes(status) && existing.tableId) await prisma.diningTable.update({ where: { id: existing.tableId }, data: { status: "AVAILABLE" } });
+    if (["PAID","CANCELLED"].includes(status) && existing.roomId) await prisma.room.update({ where: { id: existing.roomId }, data: { status: "CLEANING" } });
+    res.json({ order });
+  } catch (error) { return fail(res, error); }
+}
+
+const isBarItem = (item) => {
+  const text = `${item.menuItem.category.name} ${item.menuItem.name}`.toLowerCase();
+  return ["drink","alcohol","cocktail","beer","wine","whisky","water","juice","cola","soda","latte","beverage"].some(word => text.includes(word));
+};
+
+export async function updateFulfillmentStatus(req,res){try{const branchId=await getBranchId(req.user.userId);const station=req.body.station;const status=req.body.status;if(!["BAR","KITCHEN"].includes(station)||!["NEW","PREPARING","READY","SERVED"].includes(status))return res.status(400).json({message:"Valid station and status are required"});const order=await prisma.order.findFirst({where:{id:Number(req.params.id),branchId},include:{items:{include:{menuItem:{include:{category:true}}}}}});if(!order)return res.status(404).json({message:"Order not found"});const itemIds=order.items.filter(item=>station==="BAR"?isBarItem(item):!isBarItem(item)).map(item=>item.id);if(!itemIds.length)return res.status(400).json({message:`This order has no ${station.toLowerCase()} items`});await prisma.orderItem.updateMany({where:{id:{in:itemIds}},data:{status}});const remaining=await prisma.orderItem.findMany({where:{orderId:order.id}});const orderStatus=remaining.every(item=>item.status==="SERVED")?"SERVED":remaining.every(item=>["READY","SERVED"].includes(item.status))?"READY":remaining.some(item=>item.status==="PREPARING")?"PREPARING":"NEW";await prisma.order.update({where:{id:order.id},data:{status:orderStatus}});res.json({message:`${station} items updated`,status})}catch(error){return fail(res,error)}}
+
+export async function createMenuItem(req, res) {
+  try { const branchId=await getBranchId(req.user.userId); const {name,price,emoji="🍽️",categoryId,category="Mains"}=req.body; if(!name||Number(price)<=0)return res.status(400).json({message:"Name and valid price are required"}); let categoryRecord=categoryId?await prisma.menuCategory.findFirst({where:{id:Number(categoryId),branchId}}):await prisma.menuCategory.upsert({where:{branchId_name:{branchId,name:category}},update:{},create:{branchId,name:category}}); const item=await prisma.menuItem.create({data:{name,price:Number(price),emoji,categoryId:categoryRecord.id,branchId},include:{category:true}}); res.status(201).json({item}); } catch(error){return fail(res,error)}
+}
+export async function updateMenuItem(req,res){try{const branchId=await getBranchId(req.user.userId);const existing=await prisma.menuItem.findFirst({where:{id:Number(req.params.id),branchId}});if(!existing)return res.status(404).json({message:"Menu item not found"});const allowed={};for(const key of ["name","description","emoji","available"])if(req.body[key]!==undefined)allowed[key]=req.body[key];if(req.body.price!==undefined)allowed.price=Number(req.body.price);if(req.body.category){const category=await prisma.menuCategory.upsert({where:{branchId_name:{branchId,name:req.body.category}},update:{},create:{branchId,name:req.body.category}});allowed.categoryId=category.id}const item=await prisma.menuItem.update({where:{id:existing.id},data:allowed,include:{category:true}});res.json({item})}catch(error){return fail(res,error)}}
+export async function deleteMenuItem(req,res){try{const branchId=await getBranchId(req.user.userId);const existing=await prisma.menuItem.findFirst({where:{id:Number(req.params.id),branchId}});if(!existing)return res.status(404).json({message:"Menu item not found"});await prisma.menuItem.delete({where:{id:existing.id}});res.status(204).end()}catch(error){return fail(res,error)}}
+
+export async function createInventory(req,res){try{const branchId=await getBranchId(req.user.userId);const {name,category="General",department="KITCHEN",unit="units",quantity=0,parLevel=0,costPerUnit=0}=req.body;if(!name)return res.status(400).json({message:"Name is required"});if(!["KITCHEN","BAR"].includes(department))return res.status(400).json({message:"Department must be Kitchen or Bar"});const item=await prisma.inventoryItem.create({data:{name,category,department,unit,quantity:Number(quantity),parLevel:Number(parLevel),costPerUnit:Number(costPerUnit),branchId}});res.status(201).json({item})}catch(error){return fail(res,error)}}
+export async function adjustInventory(req,res){try{const branchId=await getBranchId(req.user.userId);const existing=await prisma.inventoryItem.findFirst({where:{id:Number(req.params.id),branchId}});if(!existing)return res.status(404).json({message:"Inventory item not found"});const quantity=Number(req.body.quantity);if(!Number.isFinite(quantity))return res.status(400).json({message:"Valid quantity is required"});const item=await prisma.$transaction(async tx=>{const updated=await tx.inventoryItem.update({where:{id:existing.id},data:{quantity:{increment:quantity}}});await tx.stockMovement.create({data:{inventoryItemId:existing.id,type:quantity>=0?"RESTOCK":"ADJUSTMENT",quantity,reason:req.body.reason||"Manual adjustment"}});return updated});res.json({item})}catch(error){return fail(res,error)}}
+
+export async function createEmployee(req,res){try{const branchId=await getBranchId(req.user.userId);const {staffId,name,role="WAITER",email,phone,hourlyRate=0}=req.body;const validRoles=["MANAGER","WAITER","LADY","BAR","KITCHEN"];if(!staffId?.trim()||!name?.trim())return res.status(400).json({message:"Staff ID and name are required"});if(!validRoles.includes(role))return res.status(400).json({message:"Invalid staff role"});const duplicate=await prisma.employee.findFirst({where:{branchId,staffId:staffId.trim()}});if(duplicate)return res.status(409).json({message:"Staff ID already exists"});const employee=await prisma.employee.create({data:{staffId:staffId.trim(),name:name.trim(),role,email,phone,hourlyRate:Number(hourlyRate),branchId},include:{attendances:true}});res.status(201).json({employee})}catch(error){return fail(res,error)}}
+export async function updateEmployee(req,res){try{const branchId=await getBranchId(req.user.userId);const employee=await prisma.employee.findFirst({where:{id:Number(req.params.id),branchId}});if(!employee)return res.status(404).json({message:"Employee not found"});const data={};for(const key of ["staffId","name","role","email","phone","active"])if(req.body[key]!==undefined)data[key]=typeof req.body[key]==="string"?req.body[key].trim():req.body[key];if(data.role&&!['MANAGER','WAITER','LADY','BAR','KITCHEN'].includes(data.role))return res.status(400).json({message:"Invalid staff role"});if(data.staffId===""||data.name==="")return res.status(400).json({message:"Staff ID and name are required"});if(data.staffId){const duplicate=await prisma.employee.findFirst({where:{branchId,staffId:data.staffId,id:{not:employee.id}}});if(duplicate)return res.status(409).json({message:"Staff ID already exists"})}if(req.body.hourlyRate!==undefined){data.hourlyRate=Number(req.body.hourlyRate);if(!Number.isFinite(data.hourlyRate)||data.hourlyRate<0)return res.status(400).json({message:"Hourly price must be zero or greater"})}res.json({employee:await prisma.employee.update({where:{id:employee.id},data,include:{attendances:{where:{clockOut:null}}}})})}catch(error){return fail(res,error)}}
+export async function deleteEmployee(req,res){try{const branchId=await getBranchId(req.user.userId);const employee=await prisma.employee.findFirst({where:{id:Number(req.params.id),branchId},include:{_count:{select:{roomAssignments:true,attendances:true}}}});if(!employee)return res.status(404).json({message:"Employee not found"});if(employee._count.roomAssignments||employee._count.attendances){await prisma.employee.update({where:{id:employee.id},data:{active:false}});return res.json({message:"Staff member archived because activity history must be preserved",archived:true})}await prisma.employee.delete({where:{id:employee.id}});res.status(204).end()}catch(error){return fail(res,error)}}
+export async function toggleAttendance(req,res){try{const branchId=await getBranchId(req.user.userId);const employee=await prisma.employee.findFirst({where:{id:Number(req.params.id),branchId}});if(!employee)return res.status(404).json({message:"Employee not found"});const open=await prisma.attendance.findFirst({where:{employeeId:employee.id,clockOut:null}});if(open)await prisma.attendance.update({where:{id:open.id},data:{clockOut:new Date()}});else await prisma.attendance.create({data:{employeeId:employee.id}});const updated=await prisma.employee.findUnique({where:{id:employee.id},include:{attendances:{where:{clockOut:null}}}});res.json({employee:updated})}catch(error){return fail(res,error)}}
+export async function createCustomer(req,res){try{const branchId=await getBranchId(req.user.userId);const {name,email,phone}=req.body;if(!name)return res.status(400).json({message:"Name is required"});const customer=await prisma.customer.create({data:{name,email,phone,branchId}});res.status(201).json({customer})}catch(error){return fail(res,error)}}
+
+export async function createRoom(req,res){try{const branchId=await getBranchId(req.user.userId);const {name,floorNumber=1,attendantCount=0,capacity=6,hourlyRate=0}=req.body;if(!name)return res.status(400).json({message:"Room name is required"});if(Number(floorNumber)<1||Number(attendantCount)<0||Number(capacity)<1||Number(hourlyRate)<0)return res.status(400).json({message:"Floor, service staff, capacity and hourly price must be valid"});const room=await prisma.room.create({data:{name,floorNumber:Number(floorNumber),attendantCount:Number(attendantCount),capacity:Number(capacity),hourlyRate:Number(hourlyRate),branchId}});res.status(201).json({room})}catch(error){return fail(res,error)}}
+export async function getRoomDetails(req,res){try{const branchId=await getBranchId(req.user.userId);const room=await prisma.room.findFirst({where:{id:Number(req.params.id),branchId},include:{orders:{include:includeOrder,orderBy:{createdAt:"desc"},take:50},sessions:{include:{assignments:{include:{employee:true},orderBy:{startTime:"asc"}}},orderBy:{startTime:"desc"},take:20}}});if(!room)return res.status(404).json({message:"Room not found"});const currentOrders=room.orders.filter(order=>!["PAID","CANCELLED"].includes(order.status));const currentBill=currentOrders.reduce((sum,order)=>sum+Number(order.total),0);const totalRevenue=room.orders.filter(order=>order.status!=="CANCELLED").reduce((sum,order)=>sum+Number(order.total),0);res.json({room,summary:{currentBill,totalRevenue,totalOrders:room.orders.length,activeOrders:currentOrders.length}})}catch(error){return fail(res,error)}}
+export async function startRoomSession(req,res){try{const branchId=await getBranchId(req.user.userId);const room=await prisma.room.findFirst({where:{id:Number(req.params.id),branchId}});if(!room)return res.status(404).json({message:"Room not found"});const active=await prisma.roomSession.findFirst({where:{roomId:room.id,endTime:null}});if(active)return res.status(409).json({message:"This room already has an active session"});const session=await prisma.$transaction(async tx=>{const created=await tx.roomSession.create({data:{roomId:room.id}});await tx.room.update({where:{id:room.id},data:{status:"OCCUPIED"}});return created});res.status(201).json({session})}catch(error){return fail(res,error)}}
+export async function endRoomSession(req,res){try{const branchId=await getBranchId(req.user.userId);const session=await prisma.roomSession.findFirst({where:{id:Number(req.params.id),endTime:null,room:{branchId}}});if(!session)return res.status(404).json({message:"Active room session not found"});const endedAt=new Date();await prisma.$transaction([prisma.roomAttendantAssignment.updateMany({where:{sessionId:session.id,endTime:null},data:{endTime:endedAt}}),prisma.roomSession.update({where:{id:session.id},data:{endTime:endedAt}}),prisma.room.update({where:{id:session.roomId},data:{status:"CLEANING"}})]);res.json({message:"Room session ended",endTime:endedAt})}catch(error){return fail(res,error)}}
+export async function assignRoomAttendant(req,res){try{const branchId=await getBranchId(req.user.userId);const session=await prisma.roomSession.findFirst({where:{id:Number(req.params.id),endTime:null,room:{branchId}}});if(!session)return res.status(404).json({message:"Active room session not found"});const employee=await prisma.employee.findFirst({where:{id:Number(req.body.employeeId),branchId,role:"LADY",active:true}});if(!employee)return res.status(404).json({message:"Active service lady not found"});const existing=await prisma.roomAttendantAssignment.findFirst({where:{employeeId:employee.id,endTime:null,session:{endTime:null}}});if(existing)return res.status(409).json({message:"This lady is already assigned to an active room"});const assignment=await prisma.roomAttendantAssignment.create({data:{sessionId:session.id,employeeId:employee.id},include:{employee:true}});res.status(201).json({assignment})}catch(error){return fail(res,error)}}
+export async function endRoomAttendant(req,res){try{const branchId=await getBranchId(req.user.userId);const assignment=await prisma.roomAttendantAssignment.findFirst({where:{id:Number(req.params.id),endTime:null,session:{room:{branchId}}}});if(!assignment)return res.status(404).json({message:"Active lady assignment not found"});const updated=await prisma.roomAttendantAssignment.update({where:{id:assignment.id},data:{endTime:new Date()},include:{employee:true}});res.json({assignment:updated})}catch(error){return fail(res,error)}}
+export async function updateRoom(req,res){try{const branchId=await getBranchId(req.user.userId);const room=await prisma.room.findFirst({where:{id:Number(req.params.id),branchId}});if(!room)return res.status(404).json({message:"Room not found"});const data={};for(const key of ["name","status"])if(req.body[key]!==undefined)data[key]=req.body[key];for(const key of ["floorNumber","attendantCount","capacity","hourlyRate"])if(req.body[key]!==undefined)data[key]=Number(req.body[key]);if(data.floorNumber<1||data.attendantCount<0||data.capacity<1||data.hourlyRate<0)return res.status(400).json({message:"Floor, service staff, capacity and hourly price must be valid"});if(data.status&&!['AVAILABLE','OCCUPIED','CLEANING','MAINTENANCE','UNAVAILABLE'].includes(data.status))return res.status(400).json({message:"Invalid room status"});res.json({room:await prisma.room.update({where:{id:room.id},data})})}catch(error){return fail(res,error)}}
+export async function deleteRoom(req,res){try{const branchId=await getBranchId(req.user.userId);const room=await prisma.room.findFirst({where:{id:Number(req.params.id),branchId},include:{_count:{select:{orders:true}}}});if(!room)return res.status(404).json({message:"Room not found"});if(room._count.orders)return res.status(409).json({message:"Rooms with order history cannot be deleted; set it to maintenance instead"});await prisma.room.delete({where:{id:room.id}});res.status(204).end()}catch(error){return fail(res,error)}}
+
+export async function getDashboard(req,res){try{const branchId=await getBranchId(req.user.userId);const start=new Date();start.setHours(0,0,0,0);const [orders,todayOrders,inventory,employeeCount,customerCount]=await Promise.all([prisma.order.findMany({where:{branchId},include:includeOrder,orderBy:{createdAt:"desc"},take:6}),prisma.order.findMany({where:{branchId,createdAt:{gte:start},status:{not:"CANCELLED"}}}),prisma.inventoryItem.findMany({where:{branchId}}),prisma.employee.count({where:{branchId,active:true}}),prisma.customer.count({where:{branchId}})]);const netSales=todayOrders.reduce((s,o)=>s+Number(o.total),0);const lowStock=inventory.filter(i=>Number(i.quantity)<=Number(i.parLevel)).length;res.json({metrics:{netSales,orders:todayOrders.length,averageOrder:todayOrders.length?netSales/todayOrders.length:0,lowStock,employeeCount,customerCount},recentOrders:orders})}catch(error){return fail(res,error)}}
+export async function getReports(req,res){try{
+  const branchId=await getBranchId(req.user.userId);const start=new Date();start.setHours(0,0,0,0);const now=new Date();
+  const [orders,roomSessions,ladyAssignments,employees]=await Promise.all([
+    prisma.order.findMany({where:{branchId,createdAt:{gte:start},status:{not:"CANCELLED"}}}),
+    prisma.roomSession.findMany({where:{room:{branchId},startTime:{lte:now},OR:[{endTime:null},{endTime:{gte:start}}]},include:{room:true}}),
+    prisma.roomAttendantAssignment.findMany({where:{session:{room:{branchId}},startTime:{lte:now},OR:[{endTime:null},{endTime:{gte:start}}]},include:{employee:true}}),
+    prisma.employee.findMany({where:{branchId,active:true},include:{attendances:{where:{clockIn:{lte:now},OR:[{clockOut:null},{clockOut:{gte:start}}]},orderBy:{clockIn:"asc"}}},orderBy:[{role:"asc"},{name:"asc"}]}),
+  ]);
+  const hoursToday=(started,ended)=>Math.max(0,(Math.min((ended||now).getTime(),now.getTime())-Math.max(started.getTime(),start.getTime()))/3600000);
+  const orderSales=orders.reduce((total,order)=>total+Number(order.total),0);
+  const roomCharges=roomSessions.reduce((total,session)=>total+hoursToday(session.startTime,session.endTime)*Number(session.room.hourlyRate),0);
+  const ladyCharges=ladyAssignments.reduce((total,assignment)=>total+hoursToday(assignment.startTime,assignment.endTime)*Number(assignment.employee.hourlyRate),0);
+  const attendance=employees.map(employee=>{const first=employee.attendances[0];const last=employee.attendances.at(-1);const hours=employee.attendances.reduce((total,record)=>total+Math.max(0,((record.clockOut||now)-record.clockIn)/3600000),0);return{id:employee.id,staffId:employee.staffId,name:employee.name,role:employee.role,status:first?"PRESENT":"ABSENT",clockIn:first?.clockIn||null,clockOut:last?.clockOut||null,hours}});
+  res.json({summary:{orders:orders.length,orderSales,rooms:roomSessions.length,roomCharges,ladies:ladyAssignments.length,ladyCharges,dailyTotal:orderSales+roomCharges+ladyCharges,date:start.toISOString(),totalStaff:attendance.length,presentStaff:attendance.filter(employee=>employee.status==="PRESENT").length,absentStaff:attendance.filter(employee=>employee.status==="ABSENT").length},attendance});
+}catch(error){return fail(res,error)}}

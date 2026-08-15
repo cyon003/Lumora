@@ -1,0 +1,34 @@
+.inventory-top-action { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.inventory-top-action button { padding: 9px 14px; border: 0; border-radius: 7px; color: #fff; background: #17685f; font-size: 8px; font-weight: 700; cursor: pointer; }
+.inventory-departments { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.inventory-departments button { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 13px; padding: 17px; border: 1px solid #dce6e2; border-radius: 12px; text-align: left; color: #60756d; background: #fff; cursor: pointer; }
+.inventory-departments button > i { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 11px; color: #17685f; background: #e5f2ee; font-size: 21px; font-style: normal; }
+.inventory-departments button > span { display: flex; flex-direction: column; gap: 4px; }
+.inventory-departments button strong { color: #29443b; font-size: 12px; }
+.inventory-departments button small { color: #8a9892; font-size: 8px; }
+.inventory-departments button > b { display: grid; place-items: center; min-width: 28px; height: 28px; border-radius: 14px; color: #17685f; background: #e6f3ef; font-size: 9px; }
+.inventory-departments button.active { border-color: #17685f; color: #fff; background: linear-gradient(135deg,#17685f,#27877b); box-shadow: 0 9px 22px rgba(23,104,95,.2); }
+.inventory-departments button.active > i { color: #fff; background: rgba(255,255,255,.16); }
+.inventory-departments button.active strong,.inventory-departments button.active small { color: #fff; }
+.inventory-departments button.active small { opacity: .72; }
+.inventory-departments button.active > b { background: #fff; }
+.inventory-summary { display: grid; grid-template-columns: 125px 125px 125px 1fr; gap: 10px; margin-bottom: 14px; }
+.inventory-summary > span { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid #dfe7e3; border-radius: 9px; color: #83918b; background: #fff; font-size: 7px; }
+.inventory-summary > span b { color: #17685f; font-size: 16px; }
+.inventory-summary > span.warning b { color: #c85d4e; }
+.inventory-summary > label { position: relative; display: flex; align-items: center; }
+.inventory-summary label i { position: absolute; left: 13px; color: #75877f; font-style: normal; }
+.inventory-summary input { width: 100%; height: 100%; min-height: 48px; padding: 0 16px 0 36px; border: 1px solid #dce5e1; border-radius: 9px; outline: 0; color: #29443b; background: #fff; font-size: 9px; }
+.inventory-summary input:focus { border-color: #37887e; box-shadow: 0 0 0 3px rgba(55,136,126,.1); }
+.inventory-categories { display: flex; gap: 9px; margin-bottom: 14px; padding-bottom: 4px; overflow-x: auto; }
+.inventory-categories button { position: relative; display: flex; min-width: 105px; flex-direction: column; align-items: center; gap: 6px; padding: 13px 10px; border: 1px solid #dfe7e3; border-radius: 10px; color: #60756c; background: #fff; cursor: pointer; }
+.inventory-categories button > i { font-size: 21px; font-style: normal; }
+.inventory-categories button > span { font-size: 8px; font-weight: 700; }
+.inventory-categories button > b { position: absolute; top: 7px; right: 8px; display: grid; place-items: center; min-width: 18px; height: 18px; border-radius: 9px; color: #31786e; background: #e7f3ef; font-size: 7px; }
+.inventory-categories button.active { border-color: #17685f; color: #fff; background: #17685f; box-shadow: 0 7px 17px rgba(23,104,95,.18); }
+.inventory-categories button.active > b { color: #17685f; background: #fff; }
+.categorized-inventory .inventory-row > strong { display: flex; align-items: center; gap: 9px; }
+.categorized-inventory .inventory-row > strong > i { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: #edf5f2; font-size: 14px; font-style: normal; }
+.categorized-inventory .inventory-row { grid-template-columns: 1.35fr .75fr .7fr .8fr .7fr 1.1fr; column-gap: 10px; min-width: 760px; }
+.categorized-inventory .daily-supplied { width: max-content; padding: 5px 8px; border-radius: 10px; color: #17685f; background: #e4f3ef; font-weight: 700; }
+@media(max-width:760px){.inventory-departments{grid-template-columns:1fr}.inventory-summary{grid-template-columns:repeat(3,1fr)}.inventory-summary>label{grid-column:1/-1}.inventory-summary input{height:46px}}

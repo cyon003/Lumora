@@ -1,0 +1,1 @@
+ALTER TABLE "InventoryItem" ADD COLUMN "department" TEXT NOT NULL DEFAULT 'KITCHEN';
