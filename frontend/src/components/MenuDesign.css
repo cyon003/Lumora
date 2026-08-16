@@ -15,6 +15,9 @@
 .menu-category-bar > span { margin-right: 5px; color: #84938d; font-size: 7px; font-weight: 700; text-transform: uppercase; }
 .menu-category-bar button { padding: 7px 11px; border: 0; border-radius: 14px; white-space: nowrap; color: #64776f; background: #f0f5f3; font-size: 8px; cursor: pointer; }
 .menu-category-bar button.active { color: #fff; background: #17685f; }
+.menu-category-bar .unavailable-filter { color: #a34d42; background: #fff0ed; }
+.menu-category-bar .unavailable-filter.active { color: #fff; background: #bd574a; }
+.menu-category-bar .unavailable-filter b { margin-left: 4px; }
 .menu-name-search { position: relative; display: flex; align-items: center; width: 230px; min-width: 190px; margin-left: auto; }
 .menu-name-search > span { position: absolute; left: 11px; color: #6f817a; font-size: 15px; }
 .menu-name-search input { width: 100%; height: 34px; padding: 0 32px; border: 1px solid #d6e2dd; border-radius: 17px; outline: 0; color: #29443b; background: #f8fbfa; font-size: 8px; }
