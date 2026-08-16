@@ -31,4 +31,8 @@
 .categorized-inventory .inventory-row > strong > i { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: #edf5f2; font-size: 14px; font-style: normal; }
 .categorized-inventory .inventory-row { grid-template-columns: 1.35fr .75fr .7fr .8fr .7fr 1.1fr; column-gap: 10px; min-width: 760px; }
 .categorized-inventory .daily-supplied { width: max-content; padding: 5px 8px; border-radius: 10px; color: #17685f; background: #e4f3ef; font-weight: 700; }
+.kitchen-stock-modal { max-width: 620px; }
+.kitchen-stock-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.kitchen-stock-fields label { display: flex; flex-direction: column; gap: 7px; color: #38554c; font-size: 9px; font-weight: 700; }
 @media(max-width:760px){.inventory-departments{grid-template-columns:1fr}.inventory-summary{grid-template-columns:repeat(3,1fr)}.inventory-summary>label{grid-column:1/-1}.inventory-summary input{height:46px}}
+@media(max-width:600px){.kitchen-stock-fields{grid-template-columns:1fr}}

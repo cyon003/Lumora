@@ -1,4 +1,4 @@
-.daily-report > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding: 18px 20px; border: 1px solid #dce6e2; border-radius: 12px; background: #fff; }
+.sales-report-section > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding: 18px 20px; border: 1px solid #dce6e2; border-radius: 12px; background: #fff; }
 .daily-report header small { color: #277b70; font-size: 7px; font-weight: 700; letter-spacing: 1.2px; }
 .daily-report header h2 { margin: 5px 0 4px; color: #29443b; font-size: 19px; }
 .daily-report header p { margin: 0; color: #84938d; font-size: 8px; }
@@ -28,4 +28,23 @@
 .attendance-report-row strong { color: #24756a; }.attendance-report-row > b { color: #29443b; }
 .attendance-report-row > i { width: max-content; padding: 5px 8px; border-radius: 10px; font-size: 6px; font-style: normal; font-weight: 700; }
 .attendance-report-row > i.present { color: #267057; background: #dff2e8; }.attendance-report-row > i.absent { color: #a04c42; background: #fae3df; }
+.inventory-daily-report { margin-top: 18px; overflow: hidden; border: 1px solid #dfe7e3; border-radius: 12px; background: #fff; }
+.inventory-daily-report > header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid #e3eae7; background: #f7faf9; }
+.inventory-daily-report header h3 { margin: 5px 0 4px; color: #29443b; font-size: 14px; }
+.inventory-report-row { display: grid; grid-template-columns: 1.4fr 1fr .8fr .8fr .8fr; align-items: center; gap: 12px; min-height: 47px; margin: 0 20px; border-top: 1px solid #e9eeec; color: #667a72; font-size: 9px; }
+.inventory-report-row.headings { min-height: 34px; border: 0; color: #98a49f; font-size: 7px; text-transform: uppercase; }
+.inventory-report-row strong { color: #29443b; }
+.inventory-report-row span:nth-last-child(-n+3) { font-weight: 700; }
+.inventory-report-row span:nth-child(4) { color: #b46932; }
+.inventory-report-row span:last-child { color: #b14e45; }
 @media(max-width:650px){.daily-report-grid{grid-template-columns:1fr}.daily-report>header{align-items:flex-start;gap:12px}.daily-grand-total{align-items:flex-start;flex-direction:column;gap:15px}}
+@media print {
+  body * { visibility: hidden !important; }
+  .daily-report, .daily-report * { visibility: visible !important; }
+  .daily-report { position: absolute; inset: 0; width: 100%; background: #fff; }
+  .daily-report button { display: none !important; }
+  .daily-report.print-sales > .inventory-daily-report { display: none; }
+  .daily-report.print-kitchen > .sales-report-section, .daily-report.print-kitchen > .inventory-daily-report.bar { display: none; }
+  .daily-report.print-bar > .sales-report-section, .daily-report.print-bar > .inventory-daily-report.kitchen { display: none; }
+  .inventory-daily-report { margin: 0; border: 0; }
+}

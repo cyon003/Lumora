@@ -14,9 +14,11 @@ router.patch("/orders/:id/status", authorize("KITCHEN", "WAITER"), operations.up
 router.patch("/orders/:id/fulfillment", authorize("BAR", "KITCHEN"), operations.updateFulfillmentStatus);
 router.post("/menu", authorize("MANAGER"), operations.createMenuItem);
 router.patch("/menu/:id", authorize("MANAGER"), operations.updateMenuItem);
+router.patch("/menu/:id/availability", authorize("MANAGER", "KITCHEN"), operations.updateDailyMenuAvailability);
 router.delete("/menu/:id", authorize("MANAGER"), operations.deleteMenuItem);
-router.post("/inventory", authorize("MANAGER", "KITCHEN"), operations.createInventory);
-router.post("/inventory/:id/adjust", authorize("MANAGER", "KITCHEN"), operations.adjustInventory);
+router.post("/inventory", authorize("MANAGER"), operations.createInventory);
+router.post("/inventory/:id/adjust", authorize("MANAGER"), operations.adjustInventory);
+router.patch("/inventory/:id/daily-status", authorize("BAR", "KITCHEN"), operations.updateDepartmentInventoryStatus);
 router.post("/employees", authorize("MANAGER"), operations.createEmployee);
 router.patch("/employees/:id", authorize("MANAGER"), operations.updateEmployee);
 router.delete("/employees/:id", authorize("MANAGER"), operations.deleteEmployee);

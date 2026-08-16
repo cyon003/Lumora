@@ -64,9 +64,20 @@ model MenuItem {
   branchId    Int
   branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
   orderItems  OrderItem[]
+  dailyAvailability DailyMenuAvailability[]
   recipes     RecipeIngredient[]
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+}
+
+model DailyMenuAvailability {
+  id         Int      @id @default(autoincrement())
+  date       DateTime @db.Date
+  available  Boolean  @default(true)
+  menuItemId Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, date])
 }
 
 model DiningTable {
